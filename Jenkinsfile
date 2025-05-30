@@ -18,12 +18,10 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
           script {
-            def ssh_base = "sshpass -p ${SSH_PASS} ssh -o StrictHostKeyChecking=no ${env.TARGET_USER}@${params.TARGET_IP}"
-            def scp_base = "sshpass -p ${SSH_PASS} scp -o StrictHostKeyChecking=no"
-            sh """
-              echo "[INFO] Setup initial pe ${params.TARGET_IP}"
+            sh '''
+              echo "[INFO] Setup initial pe $TARGET_IP"
 
-              sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${TARGET_USER}@${params.TARGET_IP} '
+              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
                 useradd --no-create-home --shell /bin/false node_exporter || true
                 mkdir -p /var/lib/node_exporter/
                 chown -R node_exporter:node_exporter /var/lib/node_exporter
@@ -31,24 +29,27 @@ pipeline {
               '
 
               echo "[INFO] Copiere scripturi"
-              sshpass -p '${SSH_PASS}' scp -o StrictHostKeyChecking=no scripts/*.sh ${TARGET_USER}@${params.TARGET_IP}:/var/lib/node_exporter/
+              sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh $TARGET_USER@$TARGET_IP:/var/lib/node_exporter/
 
               echo "[INFO] Setare permisiuni si crontab"
-              sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${TARGET_USER}@${params.TARGET_IP} '
+              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
                 chmod +x /var/lib/node_exporter/*.sh
                 crontab -l > tempcron || true
                 for script in /var/lib/node_exporter/*.sh; do
-                  name=\\$(basename "\\\$script" .sh)
-                  line="*/1 * * * * \\\$script"
-                  grep -qF "\\\$line" tempcron || echo "\\\$line" >> tempcron
+                  name=$(basename "$script" .sh)
+                  line="*/1 * * * * $script"
+                  grep -qF "$line" tempcron || echo "$line" >> tempcron
                 done
                 crontab tempcron && rm tempcron
               '
-            """
+            '''
           }
         }
       }
     }
+
+
+    
 
     stage('Inregistrare in Prometheus') {
       steps {
