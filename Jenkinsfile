@@ -32,6 +32,9 @@ pipeline {
               echo "[INFO] Copiere scripturi de monitorizare"
               sshpass -p "\$SSH_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh \$TARGET_USER@\$TARGET_IP:/var/lib/node_exporter/
 
+              echo "[INFO] Oprire temporara node_exporter pentru update binar"
+              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP 'systemctl stop node_exporter || true'
+
               echo "[INFO] Copiere binar node_exporter"
               sshpass -p "\$SSH_PASS" scp -o StrictHostKeyChecking=no node_exporter \$TARGET_USER@\$TARGET_IP:/usr/local/bin/
 
