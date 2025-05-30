@@ -113,9 +113,9 @@ EOF
     stage('Verificare metrica') {
       steps {
         script {
-          def status = sh(script: "curl -s http://${params.TARGET_IP}:9100/metrics | grep -q 'service_up'", returnStatus: true)
+          def status = sh(script: "curl -s http://${params.TARGET_IP}:9100/metrics | grep -q 'node_time_seconds'", returnStatus: true)
           if (status != 0) {
-            error("Metrica 'service_up' nu a fost gasita pe ${params.TARGET_IP}")
+            error("Metrica 'node_time_seconds' nu a fost gasita pe ${params.TARGET_IP}")
           } else {
             echo "Metrica detectata cu succes pe ${params.TARGET_IP}"
           }
