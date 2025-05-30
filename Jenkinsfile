@@ -48,25 +48,27 @@ pipeline {
       }
     }
 
-
-    
-
     stage('Inregistrare in Prometheus') {
       steps {
         withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
           script {
-            def ssh_prom = "sshpass -p ${SSH_PASS} ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
+            sh '''
+              echo "[INFO] Adaugare IP in Prometheus"
 
-            sh """
-              echo "[INFO] Adaugare IP ${params.TARGET_IP} in Prometheus"
-              ${ssh_prom} '
-                jq --arg ip "${params.TARGET_IP}" '
-                  if any(.[]; .targets[] == "\($ip):${EXPORTER_PORT}") then . else . + [{ "targets": ["\($ip):${EXPORTER_PORT}"], "labels": { "job": "node_exporter" } }] end
-                ' ${env.PROMETHEUS_NODE_JSON} > temp.json &&
-                mv temp.json ${env.PROMETHEUS_NODE_JSON} &&
+              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROMETHEUS_USER@$PROMETHEUS_HOST '
+                ip="$TARGET_IP"
+                port="$EXPORTER_PORT"
+                node_file="$PROMETHEUS_NODE_JSON"
+
+                jq --arg ip "$ip" --arg port "$port" '
+                  if any(.[]; .targets[] == "\\($ip):\\($port)") then .
+                  else . + [{ "targets": ["\\($ip):\\($port)"], "labels": { "job": "node_exporter" } }]
+                  end
+                ' "$node_file" > temp.json &&
+                mv temp.json "$node_file" &&
                 systemctl reload prometheus
               '
-            """
+            '''
           }
         }
       }
