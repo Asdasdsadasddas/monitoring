@@ -20,7 +20,6 @@ pipeline {
           script {
             def ssh_base = "sshpass -p ${SSH_PASS} ssh -o StrictHostKeyChecking=no ${env.TARGET_USER}@${params.TARGET_IP}"
             def scp_base = "sshpass -p ${SSH_PASS} scp -o StrictHostKeyChecking=no"
-
             sh """
               echo "[INFO] Setup initial pe ${params.TARGET_IP}"
               ${ssh_base} '
@@ -38,13 +37,14 @@ pipeline {
                 chmod +x /var/lib/node_exporter/*.sh &&
                 crontab -l > tempcron || true &&
                 for script in /var/lib/node_exporter/*.sh; do
-                  name=$(basename "$script" .sh)
-                  line="*/1 * * * * \$script "
-                  grep -qF "\$line" tempcron || echo "\$line" >> tempcron
+                  name=\\$(basename "\\\$script" .sh)
+                  line="*/1 * * * * \\\$script"
+                  grep -qF "\\\$line" tempcron || echo "\\\$line" >> tempcron
                 done
                 crontab tempcron && rm tempcron
               '
             """
+
           }
         }
       }
