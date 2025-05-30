@@ -22,29 +22,28 @@ pipeline {
             def scp_base = "sshpass -p ${SSH_PASS} scp -o StrictHostKeyChecking=no"
             sh """
               echo "[INFO] Setup initial pe ${params.TARGET_IP}"
-              ${ssh_base} '
-                useradd --no-create-home --shell /bin/false node_exporter || true &&
-                mkdir -p /var/lib/node_exporter/ &&
-                chown -R node_exporter:node_exporter /var/lib/node_exporter &&
+              ${ssh_base} <<'EOF'
+                useradd --no-create-home --shell /bin/false node_exporter || true
+                mkdir -p /var/lib/node_exporter/
+                chown -R node_exporter:node_exporter /var/lib/node_exporter
                 systemctl daemon-reexec || true
-              '
+              EOF
 
               echo "[INFO] Copiere toate scripturile de monitorizare"
               ${scp_base} scripts/*.sh ${env.TARGET_USER}@${params.TARGET_IP}:/var/lib/node_exporter/
 
               echo "[INFO] Setare permisiuni si crontab"
-              ${ssh_base} '
-                chmod +x /var/lib/node_exporter/*.sh &&
-                crontab -l > tempcron || true &&
+              ${ssh_base} <<'EOF'
+                chmod +x /var/lib/node_exporter/*.sh
+                crontab -l > tempcron || true
                 for script in /var/lib/node_exporter/*.sh; do
-                  name=\\$(basename "\\\$script" .sh)
-                  line="*/1 * * * * \\\$script"
-                  grep -qF "\\\$line" tempcron || echo "\\\$line" >> tempcron
+                  name=$(basename "$script" .sh)
+                  line="*/1 * * * * \$script"
+                  grep -qF "\$line" tempcron || echo "\$line" >> tempcron
                 done
                 crontab tempcron && rm tempcron
-              '
+              EOF
             """
-
           }
         }
       }
