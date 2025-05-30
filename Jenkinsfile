@@ -22,7 +22,8 @@ pipeline {
             def scp_base = "sshpass -p ${SSH_PASS} scp -o StrictHostKeyChecking=no"
             sh """
               echo "[INFO] Setup initial pe ${params.TARGET_IP}"
-              ${ssh_base} <<'EOF'
+
+              sshpass -p ${SSH_PASS} ssh -o StrictHostKeyChecking=no ${env.TARGET_USER}@${params.TARGET_IP} <<'EOF'
                 useradd --no-create-home --shell /bin/false node_exporter || true
                 mkdir -p /var/lib/node_exporter/
                 chown -R node_exporter:node_exporter /var/lib/node_exporter
@@ -30,10 +31,10 @@ pipeline {
               EOF
 
               echo "[INFO] Copiere toate scripturile de monitorizare"
-              ${scp_base} scripts/*.sh ${env.TARGET_USER}@${params.TARGET_IP}:/var/lib/node_exporter/
+              sshpass -p ${SSH_PASS} scp -o StrictHostKeyChecking=no scripts/*.sh ${env.TARGET_USER}@${params.TARGET_IP}:/var/lib/node_exporter/
 
               echo "[INFO] Setare permisiuni si crontab"
-              ${ssh_base} <<'EOF'
+              sshpass -p ${SSH_PASS} ssh -o StrictHostKeyChecking=no ${env.TARGET_USER}@${params.TARGET_IP} <<'EOF'
                 chmod +x /var/lib/node_exporter/*.sh
                 crontab -l > tempcron || true
                 for script in /var/lib/node_exporter/*.sh; do
