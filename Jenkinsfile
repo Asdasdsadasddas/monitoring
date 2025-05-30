@@ -56,18 +56,16 @@ pipeline {
               def port = env.EXPORTER_PORT
               def nodeFile = env.PROMETHEUS_NODE_JSON
               def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
-
               sh """
-                echo "[INFO] Adaugare IP ${ip} in Prometheus"
-                ${sshProm} bash -s <<EOF
-                  jq --arg ip "${ip}" --arg port "${port}" '
-                    if any(.[]; .targets[] == "\\(\$ip):\\(\$port)") 
-                    then . 
-                    else . + [{ "targets": ["\\(\$ip):\\(\$port)"], "labels": { "job": "node_exporter" } }] 
-                    end
-                  ' ${nodeFile} > temp.json &&
-                  mv temp.json ${nodeFile} &&
-                  systemctl reload prometheus
+                ${sshProm} bash -s <<'EOF'
+              jq --arg ip "${ip}" --arg port "${port}" '
+                if any(.[]; .targets[] == "\\\\(\$ip):\\\\(\$port)")
+                then .
+                else . + [{ "targets": ["\\\\(\$ip):\\\\(\$port)"], "labels": { "job": "node_exporter" } }]
+                end
+              ' ${nodeFile} > temp.json &&
+              mv temp.json ${nodeFile} &&
+              systemctl reload prometheus
 EOF
               """
             }
