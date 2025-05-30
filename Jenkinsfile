@@ -21,7 +21,7 @@ pipeline {
             sh '''
               echo "[INFO] Setup initial pe $TARGET_IP"
 
-              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+              /usr/bin/sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
                 useradd --no-create-home --shell /bin/false node_exporter || true
                 mkdir -p /var/lib/node_exporter/
                 chown -R node_exporter:node_exporter /var/lib/node_exporter
@@ -29,10 +29,10 @@ pipeline {
               '
 
               echo "[INFO] Copiere scripturi"
-              sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh $TARGET_USER@$TARGET_IP:/var/lib/node_exporter/
+              /usr/bin/sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh $TARGET_USER@$TARGET_IP:/var/lib/node_exporter/
 
               echo "[INFO] Setare permisiuni si crontab"
-              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+              /usr/bin/sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
                 chmod +x /var/lib/node_exporter/*.sh
                 crontab -l > tempcron || true
                 for script in /var/lib/node_exporter/*.sh; do
@@ -55,7 +55,7 @@ pipeline {
             sh '''
               echo "[INFO] Adaugare IP in Prometheus"
 
-              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROMETHEUS_USER@$PROMETHEUS_HOST '
+              /usr/bin/sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $PROMETHEUS_USER@$PROMETHEUS_HOST '
                 ip="$TARGET_IP"
                 port="$EXPORTER_PORT"
                 node_file="$PROMETHEUS_NODE_JSON"
