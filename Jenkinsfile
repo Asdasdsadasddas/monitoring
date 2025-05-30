@@ -59,6 +59,8 @@ EOF
                 systemctl daemon-reexec
                 systemctl enable node_exporter
                 systemctl restart node_exporter
+                iptables -C INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 9100 -j ACCEPT
+
               '
 
               echo "[INFO] Configurare crontab pentru scripturi"
