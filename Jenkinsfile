@@ -98,12 +98,18 @@ ip=\"${ip}\"
 port=\"${port}\"
 node_file=\"${nodeFile}\"
 
-jq --arg ip \"\$ip\" --arg port \"\$port\" '
-  if any(.[]; .targets[] == \"\\(\$ip):\\(\$port)\")
+jq --arg ip "$ip" --arg port "$port" '
+  if any(.[]; .targets[] == "\($ip):\($port)")
   then .
-  else . + [{ \"targets\": [\"\\(\$ip):\\(\$port)\"], \"labels\": { \"job\": \"node_exporter\" } }]
+  else . + [{
+    "targets": ["\($ip):\($port)"],
+    "labels": {
+      "job": "node_exporter",
+      "env": "test"
+    }
+  }]
   end
-' \"\$node_file\" > temp.json &&
+' "$node_file" > temp.json &&
 
 mv temp.json \"\$node_file\" &&
 systemctl reload prometheus
