@@ -90,29 +90,19 @@ EOF
             script {
               def ip = params.TARGET_IP
               def port = env.EXPORTER_PORT
-              def nodeFile = "${env.PROMETHEUS_NODE_JSON}"
+              def nodeFile = env.PROMETHEUS_NODE_JSON
               def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
-
-              // Construim scriptul ca string separat
-              def remoteScript = '''
-              ip="${ip}"
-              port="${port}"
-              node_file="${nodeFile}"
-
-              jq --arg ip "$ip" --arg port "$port" '
-                if any(.[]; .targets[] == "\\($ip):\\($port)")
-                then .
-                else . + [{ "targets": ["\\($ip):\\($port)"], "labels": { "job": "node_exporter" } }]
-                end
-              ' "$node_file" > temp.json &&
-              mv temp.json "$node_file" &&
-              systemctl reload prometheus
-              '''
-
-              // Trimit scriptul prin SSH si il rulez
               sh """
-                echo "[INFO] Adaugare IP ${ip} in Prometheus"
-                echo '${remoteScript}' | ${sshProm} bash
+                ${sshProm} bash -s <<'EOF'
+              jq --arg ip "${ip}" --arg port "${port}" '
+                if any(.[]; .targets[] == "\\\\(\$ip):\\\\(\$port)")
+                then .
+                else . + [{ "targets": ["\\\\(\$ip):\\\\(\$port)"], "labels": { "job": "node_exporter" } }]
+                end
+              ' ${nodeFile} > temp.json &&
+              mv temp.json ${nodeFile} &&
+              systemctl reload prometheus
+EOF
               """
             }
           }
