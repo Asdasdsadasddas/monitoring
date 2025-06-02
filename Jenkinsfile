@@ -17,35 +17,35 @@ pipeline {
     stage('Setup pe serverul tinta') {
       steps {
         withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
-          script {
-            sh """
-              echo "[INFO] Setup initial pe \$TARGET_IP"
+          withEnv(["MY_PASS=$SSH_PASS"]) {
+            script {
+              sh '''
+                echo "[INFO] Setup initial pe $TARGET_IP"
 
-              sshpass -p "\$SSH_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
-                useradd --no-create-home --shell /bin/false node_exporter || true
-                mkdir -p /var/lib/node_exporter/textfile_collector
-                chown -R node_exporter:node_exporter /var/lib/node_exporter
-                mkdir -p /usr/local/bin
-                systemctl daemon-reexec || true
-              '
+                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+                  useradd --no-create-home --shell /bin/false node_exporter || true
+                  mkdir -p /var/lib/node_exporter/textfile_collector
+                  chown -R node_exporter:node_exporter /var/lib/node_exporter
+                  mkdir -p /usr/local/bin
+                  systemctl daemon-reexec || true
+                '
 
-              echo "[INFO] Copiere scripturi de monitorizare"
-              sshpass -p "\$SSH_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh \$TARGET_USER@\$TARGET_IP:/var/lib/node_exporter/
+                echo "[INFO] Copiere scripturi de monitorizare"
+                sshpass -p "$MY_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh $TARGET_USER@$TARGET_IP:/var/lib/node_exporter/
 
-              echo "[INFO] Oprire temporara node_exporter pentru update binar"
-              sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP 'systemctl stop node_exporter || true'
+                echo "[INFO] Oprire temporara node_exporter pentru update binar"
+                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP 'systemctl stop node_exporter || true'
 
-              echo "[INFO] Copiere binar node_exporter"
-              sshpass -p "\$SSH_PASS" scp -o StrictHostKeyChecking=no node_exporter \$TARGET_USER@\$TARGET_IP:/usr/local/bin/
+                echo "[INFO] Copiere binar node_exporter"
+                sshpass -p "$MY_PASS" scp -o StrictHostKeyChecking=no node_exporter $TARGET_USER@$TARGET_IP:/usr/local/bin/
 
-              echo "[INFO] Setare permisiuni si creare serviciu node_exporter"
-              sshpass -p "\$SSH_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
-                chmod +x /usr/local/bin/node_exporter
-                chown node_exporter:node_exporter /usr/local/bin/node_exporter
+                echo "[INFO] Setare permisiuni si creare serviciu node_exporter"
+                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+                  chmod +x /usr/local/bin/node_exporter
+                  chown node_exporter:node_exporter /usr/local/bin/node_exporter
 
-                cat <<EOF > /etc/systemd/system/node_exporter.service
+                  cat <<EOF > /etc/systemd/system/node_exporter.service
 [Unit]
-Description=Node Exporter
 Description=Node Exporter
 After=network.target
 
@@ -53,62 +53,70 @@ After=network.target
 User=node_exporter
 Group=node_exporter
 Type=simple
-ExecStart=/usr/local/bin/node_exporter --collector.textfile.directory=/var/lib/node_exporter --collector.systemd
+ExecStart=/usr/local/bin/node_exporter --collector.textfile.directory=/var/lib/node_exporter/textfile_collector --collector.systemd
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-                systemctl daemon-reexec
-                systemctl enable node_exporter
-                systemctl restart node_exporter
-                iptables -C INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 9100 -j ACCEPT
+                  systemctl daemon-reexec
+                  systemctl enable node_exporter
+                  systemctl restart node_exporter
+                  iptables -C INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport 9100 -j ACCEPT
+                '
 
-              '
-
-              echo "[INFO] Configurare crontab pentru scripturi"
-              sshpass -p "\$SSH_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
-                chmod +x /var/lib/node_exporter/*.sh
-                crontab -l > tempcron || true
-                for script in /var/lib/node_exporter/*.sh; do
-                  name=\$(basename "\$script" .sh)
-                  line="*/1 * * * * \$script > /var/lib/node_exporter/textfile_collector/\$name.prom"
-                  grep -qF "\$line" tempcron || echo "\$line" >> tempcron
-                done
-                crontab tempcron && rm tempcron
-              '
-            """
+                echo "[INFO] Configurare crontab pentru scripturi"
+                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+                  chmod +x /var/lib/node_exporter/*.sh
+                  crontab -l > tempcron || true
+                  for script in /var/lib/node_exporter/*.sh; do
+                    name=$(basename "$script" .sh)
+                    line="*/1 * * * * $script > /var/lib/node_exporter/textfile_collector/$name.prom"
+                    grep -qF "$line" tempcron || echo "$line" >> tempcron
+                  done
+                  crontab tempcron && rm tempcron
+                '
+              '''
+            }
           }
         }
       }
     }
 
+    stage('Inregistrare in Prometheus') {
+      steps {
+        withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
+          script {
+            def ip = params.TARGET_IP
+            def port = env.EXPORTER_PORT
+            def nodeFile = env.PROMETHEUS_NODE_JSON
+            def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
 
-      stage('Inregistrare in Prometheus') {
-        steps {
-          withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
-            script {
-              def ip = params.TARGET_IP
-              def port = env.EXPORTER_PORT
-              def nodeFile = env.PROMETHEUS_NODE_JSON
-              def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
-              sh """
-                ${sshProm} bash -s <<'EOF'
-              jq --arg ip "${ip}" --arg port "${port}" '
-                if any(.[]; .targets[] == "\\\\(\$ip):\\\\(\$port)")
-                then .
-                else . + [{ "targets": ["\\\\(\$ip):\\\\(\$port)"], "labels": { "job": "node_exporter" } }]
-                end
-              ' ${nodeFile} > temp.json &&
-              mv temp.json ${nodeFile} &&
-              systemctl reload prometheus
-EOF
-              """
-            }
+            writeFile file: 'register_target.sh', text: """
+#!/bin/bash
+ip=\"${ip}\"
+port=\"${port}\"
+node_file=\"${nodeFile}\"
+
+jq --arg ip \"\$ip\" --arg port \"\$port\" '
+  if any(.[]; .targets[] == \"\\(\$ip):\\(\$port)\")
+  then .
+  else . + [{ \"targets\": [\"\\(\$ip):\\(\$port)\"], \"labels\": { \"job\": \"node_exporter\" } }]
+  end
+' \"\$node_file\" > temp.json &&
+
+mv temp.json \"\$node_file\" &&
+systemctl reload prometheus
+"""
+            sh """
+              echo "[INFO] Adaugare IP ${ip} in Prometheus"
+              chmod +x register_target.sh
+              cat register_target.sh | ${sshProm} bash
+            """
           }
         }
       }
-
+    }
 
     stage('Verificare metrica') {
       steps {
