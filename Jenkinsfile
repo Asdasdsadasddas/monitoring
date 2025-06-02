@@ -90,7 +90,7 @@ EOF
             script {
               def ip = params.TARGET_IP
               def port = env.EXPORTER_PORT
-              def nodeFile = env.PROMETHEUS_NODE_JSON
+              def nodeFile = "${env.PROMETHEUS_NODE_JSON}"
               def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
 
               // Construim scriptul ca string separat
@@ -109,7 +109,7 @@ EOF
                 systemctl reload prometheus
               """
 
-              // Trimit scriptul prin SSH și îl rulez
+              // Trimit scriptul prin SSH si il rulez
               sh """
                 echo "[INFO] Adaugare IP ${ip} in Prometheus"
                 echo '${remoteScript}' | ${sshProm} bash
