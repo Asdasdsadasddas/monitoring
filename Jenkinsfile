@@ -83,46 +83,58 @@ EOF
       }
     }
 
-    stage('Inregistrare in Prometheus') {
-      steps {
-        withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
-          script {
-            def ip = params.TARGET_IP
-            def port = env.EXPORTER_PORT
-            def nodeFile = env.PROMETHEUS_NODE_JSON
-            def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
+stage('Inregistrare in Prometheus') {
+  steps {
+    withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
+      script {
+        def ip = params.TARGET_IP
+        def port = env.EXPORTER_PORT
+        def nodeFile = PROMETHEUS_NODE_JSON
+        def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${PROMETHEUS_USER}@${PROMETHEUS_HOST}"
+        
+        // Obtine hostname-ul de pe serverul monitorizat
+        def hostname = sh(
+          script: "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${TARGET_USER}@${ip} hostname",
+          returnStdout: true
+        ).trim()
 
-            writeFile file: 'register_target.sh', text: """
+        // Scrie scriptul de inregistrare
+        writeFile file: 'register_target.sh', text: """
 #!/bin/bash
-ip=\"${ip}\"
-port=\"${port}\"
-node_file=\"${nodeFile}\"
+ip="${ip}"
+port="${port}"
+node_file="${nodeFile}"
+hostname="${hostname}"
 
-jq --arg ip \"\$ip\" --arg port \"\$port\" '
+jq --arg ip "\$ip" --arg port "\$port" --arg hostname "\$hostname" '
   if any(.[]; .targets[] == "\\(\$ip):\\(\$port)")
   then .
   else . + [{
     "targets": ["\\(\$ip):\\(\$port)"],
     "labels": {
       "job": "node_exporter",
-      "env": "test"
+      "env": "test",
+      "hostname": \$hostname
     }
   }]
   end
-' \"\$node_file\" > temp.json &&
+' "\$node_file" > temp.json &&
 
-mv temp.json \"\$node_file\" &&
+mv temp.json "\$node_file" &&
 systemctl reload prometheus
 """
-            sh """
-              echo "[INFO] Adaugare IP ${ip} in Prometheus"
-              chmod +x register_target.sh
-              cat register_target.sh | ${sshProm} bash
-            """
-          }
-        }
+
+        // Executa pe serverul Prometheus
+        sh """
+          echo "[INFO] Adaugare IP ${ip} in Prometheus cu hostname '${hostname}'"
+          chmod +x register_target.sh
+          cat register_target.sh | ${sshProm} bash
+        """
       }
     }
+  }
+}
+
 
     stage('Verificare metrica') {
       steps {
