@@ -24,7 +24,7 @@ pipeline {
 
                 sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
                   useradd --no-create-home --shell /bin/false node_exporter || true
-                  mkdir -p /var/lib/node_exporter/textfile_collector
+                  mkdir -p /var/lib/node_exporter/
                   chown -R node_exporter:node_exporter /var/lib/node_exporter
                   mkdir -p /usr/local/bin
                   systemctl daemon-reexec || true
@@ -94,24 +94,25 @@ EOF
 
             writeFile file: 'register_target.sh', text: """
 #!/bin/bash
-ip=\"${ip}\"
-port=\"${port}\"
-node_file=\"${nodeFile}\"
+ip="${ip}"
+port="${port}"
+node_file="${nodeFile}"
+hostname="${hostname}"
 
-jq --arg ip \"\$ip\" --arg port \"\$port\" '
-  if any(.[]; .targets[] == "\\(\$ip):\\(\$port)")
+jq --arg ip "$ip" --arg port "$port" --arg hostname "$hostname" '
+  if any(.[]; .targets[] == "\($ip):\($port)")
   then .
   else . + [{
-    "targets": ["\\(\$ip):\\(\$port)"],
+    "targets": ["\($ip):\($port)"],
     "labels": {
       "job": "node_exporter",
-      "env": "test"
+      "env": "test",
+      "hostname": $hostname
     }
   }]
-  end
-' \"\$node_file\" > temp.json &&
+' "$node_file" > temp.json &&
 
-mv temp.json \"\$node_file\" &&
+mv temp.json "$node_file" &&
 systemctl reload prometheus
 """
             sh """
