@@ -90,28 +90,27 @@ EOF
             def ip = params.TARGET_IP
             def port = env.EXPORTER_PORT
             def nodeFile = env.PROMETHEUS_NODE_JSON
-            def hostname = sh(script: "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.TARGET_USER}@${ip} hostname", returnStdout: true).trim()
+            def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
 
-  writeFile file: 'register_target.sh', text: """
+            writeFile file: 'register_target.sh', text: """
 #!/bin/bash
 ip=\"${ip}\"
 port=\"${port}\"
 node_file=\"${nodeFile}\"
-hostname=\"${hostname}\"
 
-jq --arg ip \"\$ip\" --arg port \"\$port\" --arg hostname \"\$hostname\" '
+jq --arg ip \"\$ip\" --arg port \"\$port\" '
   if any(.[]; .targets[] == "\\(\$ip):\\(\$port)")
   then .
   else . + [{
     "targets": ["\\(\$ip):\\(\$port)"],
     "labels": {
       "job": "node_exporter",
-      "env": "test",
-      "hostname": \$hostname
+      "env": "test"
     }
   }]
   end
 ' \"\$node_file\" > temp.json &&
+
 mv temp.json \"\$node_file\" &&
 systemctl reload prometheus
 """
