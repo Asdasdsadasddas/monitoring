@@ -94,26 +94,25 @@ EOF
 
             writeFile file: 'register_target.sh', text: """
 #!/bin/bash
-ip=\"${ip}\"
-port=\"${port}\"
-node_file=\"${nodeFile}\"
-hostname="\"${hostname}\"
+ip="${ip}"
+port="${port}"
+node_file="${nodeFile}"
+hostname="${hostname}"
 
-jq --arg ip \"\$ip\" --arg port \"\$port\" --arg hostname \"\$hostname\" '
-  if any(.[]; .targets[] == "\\(\$ip):\\(\$port)")
+jq --arg ip "$ip" --arg port "$port" --arg hostname "$hostname" '
+  if any(.[]; .targets[] == "\($ip):\($port)")
   then .
   else . + [{
-    "targets": ["\\(\$ip):\\(\$port)"],
+    "targets": ["\($ip):\($port)"],
     "labels": {
       "job": "node_exporter",
       "env": "test",
       "hostname": $hostname
     }
   }]
-  end
-' \"\$node_file\" > temp.json &&
+' "$node_file" > temp.json &&
 
-mv temp.json \"\$node_file\" &&
+mv temp.json "$node_file" &&
 systemctl reload prometheus
 """
             sh """
