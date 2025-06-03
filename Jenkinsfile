@@ -71,7 +71,7 @@ EOF
                   crontab -l > tempcron || true
                   for script in /var/lib/node_exporter/*.sh; do
                     name=$(basename "$script" .sh)
-                    line="*/1 * * * * $script > /var/lib/node_exporter/textfile_collector/$name.prom"
+                    line="*/1 * * * * $script"
                     grep -qF "$line" tempcron || echo "$line" >> tempcron
                   done
                   crontab tempcron && rm tempcron
