@@ -53,7 +53,7 @@ After=network.target
 User=node_exporter
 Group=node_exporter
 Type=simple
-ExecStart=/usr/local/bin/node_exporter --collector.textfile.directory=/var/lib/node_exporter/textfile_collector --collector.systemd
+ExecStart=/usr/local/bin/node_exporter --collector.textfile.directory=/var/lib/node_exporter/ --collector.systemd
 
 [Install]
 WantedBy=multi-user.target
@@ -92,29 +92,29 @@ EOF
             def nodeFile = env.PROMETHEUS_NODE_JSON
             def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${env.PROMETHEUS_USER}@${env.PROMETHEUS_HOST}"
 
-            writeFile file: 'register_target.sh', text: """
-#!/bin/bash
+writeFile file: 'register_target.sh', text: '''#!/bin/bash
 ip="${ip}"
 port="${port}"
 node_file="${nodeFile}"
 hostname="${hostname}"
 
 jq --arg ip "$ip" --arg port "$port" --arg hostname "$hostname" '
-  if any(.[]; .targets[] == "\($ip):\($port)")
+  if any(.[]; .targets[] == "\\($ip):\\($port)")
   then .
   else . + [{
-    "targets": ["\($ip):\($port)"],
+    "targets": ["\\($ip):\\($port)"],
     "labels": {
       "job": "node_exporter",
       "env": "test",
       "hostname": $hostname
     }
   }]
+  end
 ' "$node_file" > temp.json &&
 
 mv temp.json "$node_file" &&
 systemctl reload prometheus
-"""
+'''
             sh """
               echo "[INFO] Adaugare IP ${ip} in Prometheus"
               chmod +x register_target.sh
