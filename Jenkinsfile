@@ -20,7 +20,7 @@ pipeline {
           withEnv(["MY_PASS=$SSH_PASS"]) {
             script {
               def selectedScripts = (params.SCRIPT_LIST ?: "").tokenize(',')
-              def scriptNames = selectedScripts.collect { it.trim() }.join(' ')
+              def scriptNames = selectedScripts.join(' ')
 
               sh """
                 echo "[INFO] Setup initial pe \$TARGET_IP"
