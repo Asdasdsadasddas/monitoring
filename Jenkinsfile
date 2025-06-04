@@ -152,12 +152,18 @@ systemctl reload prometheus
   }
 
   post {
-    echo "Scripturi selectate: ${params.SCRIPT_LIST}"
     success {
       echo "Serverul ${params.TARGET_IP} a fost configurat complet pentru monitorizare."
     }
     failure {
       echo "Eroare in procesul de configurare pentru ${params.TARGET_IP}."
+    }
+  }
+}
+stage('Debug parametru') {
+  steps {
+    script {
+      echo "Scripturi selectate: ${params.SCRIPT_LIST}"
     }
   }
 }
