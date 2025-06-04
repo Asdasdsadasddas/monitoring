@@ -137,6 +137,14 @@ systemctl reload prometheus
       }
     }
 
+    stage('Debug parametru') {
+      steps {
+        script {
+          echo "Scripturi selectate: ${params.SCRIPT_LIST}"
+        }
+      }
+    }   
+
     stage('Verificare metrica') {
       steps {
         script {
@@ -151,13 +159,6 @@ systemctl reload prometheus
     }
   }
 
-    stage('Debug parametru') {
-    steps {
-      script {
-        echo "Scripturi selectate: ${params.SCRIPT_LIST}"
-      }
-    }
-  }
 
   post {
     success {
