@@ -3,7 +3,6 @@ pipeline {
 
   parameters {
     string(name: 'TARGET_IP', description: 'IP-ul serverului de monitorizat')
-    string(name: 'SCRIPT_LIST', description: 'Lista scripturilor de monitorizare de adaugat pe server destinatie')
   }
 
   environment {
