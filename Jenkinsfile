@@ -19,7 +19,7 @@ pipeline {
         withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
           withEnv(["MY_PASS=$SSH_PASS"]) {
             script {
-              def selectedScripts = params.SCRIPT_LIST.tokenize(',')
+              def selectedScripts = (params.SCRIPT_LIST ?: "").tokenize(',')
               def scriptNames = selectedScripts.collect { it.trim() + ".sh" }.join(' ')
 
               sh """
