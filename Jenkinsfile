@@ -3,6 +3,7 @@ pipeline {
 
   parameters {
     string(name: 'TARGET_IP', description: 'IP-ul serverului de monitorizat')
+    string(name: 'SCRIPT_LIST', description: 'Lista scripturilor de monitorizare de adaugat pe server destinatie')
   }
 
   environment {
@@ -19,10 +20,13 @@ pipeline {
         withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
           withEnv(["MY_PASS=$SSH_PASS"]) {
             script {
-              sh '''
-                echo "[INFO] Setup initial pe $TARGET_IP"
+              def selectedScripts = params.SCRIPT_LIST.tokenize(',')
+              def scriptNames = selectedScripts.collect { it.trim() + ".sh" }.join(' ')
 
-                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+              sh """
+                echo "[INFO] Setup initial pe \$TARGET_IP"
+
+                sshpass -p "\$MY_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
                   useradd --no-create-home --shell /bin/false node_exporter || true
                   mkdir -p /var/lib/node_exporter/
                   chown -R node_exporter:node_exporter /var/lib/node_exporter
@@ -30,17 +34,19 @@ pipeline {
                   systemctl daemon-reexec || true
                 '
 
-                echo "[INFO] Copiere scripturi de monitorizare"
-                sshpass -p "$MY_PASS" scp -o StrictHostKeyChecking=no scripts/*.sh $TARGET_USER@$TARGET_IP:/var/lib/node_exporter/
+                echo "[INFO] Copiere scripturi selectate din /var/lib/jenkins/scripts/: ${scriptNames}"
+                for script in ${selectedScripts.join(' ')}; do
+                  sshpass -p "\$MY_PASS" scp -o StrictHostKeyChecking=no /var/lib/jenkins/scripts/\${script}.sh \$TARGET_USER@\$TARGET_IP:/var/lib/node_exporter/
+                done
 
                 echo "[INFO] Oprire temporara node_exporter pentru update binar"
-                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP 'systemctl stop node_exporter || true'
+                sshpass -p "\$MY_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP 'systemctl stop node_exporter || true'
 
                 echo "[INFO] Copiere binar node_exporter"
-                sshpass -p "$MY_PASS" scp -o StrictHostKeyChecking=no node_exporter $TARGET_USER@$TARGET_IP:/usr/local/bin/
+                sshpass -p "\$MY_PASS" scp -o StrictHostKeyChecking=no node_exporter \$TARGET_USER@\$TARGET_IP:/usr/local/bin/
 
                 echo "[INFO] Setare permisiuni si creare serviciu node_exporter"
-                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+                sshpass -p "\$MY_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
                   chmod +x /usr/local/bin/node_exporter
                   chown node_exporter:node_exporter /usr/local/bin/node_exporter
 
@@ -66,40 +72,38 @@ EOF
                 '
 
                 echo "[INFO] Configurare crontab pentru scripturi"
-                sshpass -p "$MY_PASS" ssh -o StrictHostKeyChecking=no $TARGET_USER@$TARGET_IP '
+                sshpass -p "\$MY_PASS" ssh -o StrictHostKeyChecking=no \$TARGET_USER@\$TARGET_IP '
                   chmod +x /var/lib/node_exporter/*.sh
                   crontab -l > tempcron || true
                   for script in /var/lib/node_exporter/*.sh; do
-                    name=$(basename "$script" .sh)
-                    line="*/1 * * * * $script"
-                    grep -qF "$line" tempcron || echo "$line" >> tempcron
+                    name=\$(basename "\$script" .sh)
+                    line="*/1 * * * * \$script"
+                    grep -qF "\$line" tempcron || echo "\$line" >> tempcron
                   done
                   crontab tempcron && rm tempcron
                 '
-              '''
+              """
             }
           }
         }
       }
     }
 
-stage('Inregistrare in Prometheus') {
-  steps {
-    withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
-      script {
-        def ip = params.TARGET_IP
-        def port = env.EXPORTER_PORT
-        def nodeFile = PROMETHEUS_NODE_JSON
-        def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${PROMETHEUS_USER}@${PROMETHEUS_HOST}"
-        
-        // Obtine hostname-ul de pe serverul monitorizat
-        def hostname = sh(
-          script: "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${TARGET_USER}@${ip} hostname",
-          returnStdout: true
-        ).trim()
+    stage('Inregistrare in Prometheus') {
+      steps {
+        withCredentials([string(credentialsId: 'ssh-root-password', variable: 'SSH_PASS')]) {
+          script {
+            def ip = params.TARGET_IP
+            def port = env.EXPORTER_PORT
+            def nodeFile = PROMETHEUS_NODE_JSON
+            def sshProm = "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${PROMETHEUS_USER}@${PROMETHEUS_HOST}"
 
-        // Scrie scriptul de inregistrare
-        writeFile file: 'register_target.sh', text: """
+            def hostname = sh(
+              script: "sshpass -p '${SSH_PASS}' ssh -o StrictHostKeyChecking=no ${TARGET_USER}@${ip} hostname",
+              returnStdout: true
+            ).trim()
+
+            writeFile file: 'register_target.sh', text: """
 #!/bin/bash
 ip="${ip}"
 port="${port}"
@@ -124,17 +128,15 @@ mv temp.json "\$node_file" &&
 systemctl reload prometheus
 """
 
-        // Executa pe serverul Prometheus
-        sh """
-          echo "[INFO] Adaugare IP ${ip} in Prometheus cu hostname '${hostname}'"
-          chmod +x register_target.sh
-          cat register_target.sh | ${sshProm} bash
-        """
+            sh """
+              echo "[INFO] Adaugare IP ${ip} in Prometheus cu hostname '${hostname}'"
+              chmod +x register_target.sh
+              cat register_target.sh | ${sshProm} bash
+            """
+          }
+        }
       }
     }
-  }
-}
-
 
     stage('Verificare metrica') {
       steps {
