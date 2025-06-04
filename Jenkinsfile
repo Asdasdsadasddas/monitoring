@@ -35,7 +35,7 @@ pipeline {
 
                 echo "[INFO] Copiere scripturi selectate din /var/lib/jenkins/scripts/: ${scriptNames}"
                 for script in ${selectedScripts.join(' ')}; do
-                  sshpass -p "\$MY_PASS" scp -o StrictHostKeyChecking=no /var/lib/jenkins/scripts/\${script}.sh \$TARGET_USER@\$TARGET_IP:/var/lib/node_exporter/
+                  sshpass -p "\$MY_PASS" scp -o StrictHostKeyChecking=no /var/lib/jenkins/scripts/\$script \$TARGET_USER@\$TARGET_IP:/var/lib/node_exporter/
                 done
 
                 echo "[INFO] Oprire temporara node_exporter pentru update binar"
